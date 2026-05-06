@@ -1,0 +1,27 @@
+{
+  "name": "run-command-hint",
+  "displayName": "Run Command Hint",
+  "description": "Muestra y guarda el comando para correr cada proyecto en la barra de estado",
+  "version": "1.0.0",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "runCommandHint.setCommand",
+        "title": "Run Command: Set project command"
+      },
+      {
+        "command": "runCommandHint.runCommand",
+        "title": "Run Command: Run in terminal"
+      },
+      {
+        "command": "runCommandHint.clearCommand",
+        "title": "Run Command: Clear project command"
+      }
+    ]
+  },
+  "icon": "icon.png"
+}
