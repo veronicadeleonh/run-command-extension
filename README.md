@@ -1,5 +1,9 @@
 # Run Command Hint
 
+![100% vibecoded](https://img.shields.io/badge/100%25-vibecoded-c46eff?style=flat-square&labelColor=0a0a0f)
+
+![Run Command Extension screenshot](assets/screenshot.png)
+
 Saves the command to run each project and shows it **in the VS Code status bar** and **in the terminal when you `cd` into the project**.
 
 Each project stores its command in a `.runcommand` file at the repo root.
@@ -29,13 +33,14 @@ Then in VS Code: `Cmd+Shift+P` → `Developer: Reload Window`
 
 ### Usage
 
-| Action | How |
-|--------|-----|
-| Save the project command | Command Palette → `Run Command: Set project command` |
-| Run the command | Click the status bar item (bottom left) |
-| Clear the command | Command Palette → `Run Command: Clear project command` |
+| Action                   | How                                                    |
+| ------------------------ | ------------------------------------------------------ |
+| Save the project command | Command Palette → `Run Command: Set project command`   |
+| Run the command          | Click the status bar item (bottom left)                |
+| Clear the command        | Command Palette → `Run Command: Clear project command` |
 
 The status bar shows:
+
 - `▶ npm run dev` — if a command is saved (click to run it)
 - `+ Set run command` — in yellow if no command is set
 
@@ -43,13 +48,13 @@ The status bar shows:
 
 When you run `Set project command`, the extension scans the project and suggests the right command:
 
-| Project type | Suggested command |
-|--------------|------------------|
-| `package.json` with `dev` script | `npm run dev` |
-| `package.json` with `start` script | `npm start` |
+| Project type                       | Suggested command      |
+| ---------------------------------- | ---------------------- |
+| `package.json` with `dev` script   | `npm run dev`          |
+| `package.json` with `start` script | `npm start`            |
 | `.py` file with `import streamlit` | `streamlit run <file>` |
-| `app.py` or `main.py` | `python app.py` |
-| `Cargo.toml` | `cargo run` |
+| `app.py` or `main.py`              | `python app.py`        |
+| `Cargo.toml`                       | `cargo run`            |
 
 Just pick from the list, or select "Type manually..." if you need a different command.
 
@@ -87,6 +92,7 @@ Every time you `cd` into a project with a `.runcommand` file, you'll see:
 ```
 
 **Available aliases:**
+
 - `rch` — show the current project's command
 - `rcr` — run the command directly
 
