@@ -83,7 +83,7 @@ function detectCommands(root) {
 function activate(context) {
   // Status bar item
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-  statusBar.command = 'runCommandHint.setCommand';
+  statusBar.command = 'runCommandHint.runCommand';
   statusBar.tooltip = 'Click to run in terminal  |  Right-click for options';
   context.subscriptions.push(statusBar);
 
