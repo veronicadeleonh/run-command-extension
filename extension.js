@@ -114,6 +114,26 @@ function activate(context) {
     vscode.workspace.onDidChangeWorkspaceFolders(refresh)
   );
 
+  // Auto-detect on startup if no command is saved
+  async function autoDetect() {
+    const root = getProjectRoot();
+    if (!root || readCommand(root)) return;
+    const detected = detectCommands(root);
+    if (detected.length === 0) return;
+    const top = detected[0].label;
+    const pick = await vscode.window.showInformationMessage(
+      `Run command detected: ${top}`,
+      'Save', 'Choose...'
+    );
+    if (pick === 'Save') {
+      writeCommand(root, top);
+      refresh();
+    } else if (pick === 'Choose...') {
+      vscode.commands.executeCommand('runCommandHint.setCommand');
+    }
+  }
+  autoDetect();
+
   // --- Commands ---
 
   context.subscriptions.push(
@@ -172,12 +192,7 @@ function activate(context) {
       if (!root) return;
       const cmd = readCommand(root);
       if (!cmd) {
-        // No command set — offer to set one
-        const action = await vscode.window.showWarningMessage(
-          'No run command set for this project.',
-          'Set command now'
-        );
-        if (action) vscode.commands.executeCommand('runCommandHint.setCommand');
+        vscode.commands.executeCommand('runCommandHint.setCommand');
         return;
       }
       const terminal = vscode.window.activeTerminal
