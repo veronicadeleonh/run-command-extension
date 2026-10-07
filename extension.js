@@ -41,32 +41,39 @@ function detectCommands(root) {
     try {
       const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
       const scripts = pkg.scripts || {};
-      if (scripts.dev)   suggestions.push({ label: 'npm run dev',   description: 'script en package.json' });
-      else if (scripts.start)  suggestions.push({ label: 'npm start',      description: 'script en package.json' });
-      else if (scripts.serve)  suggestions.push({ label: 'npm run serve',  description: 'script en package.json' });
+      if (scripts.dev)        suggestions.push({ label: 'npm run dev',   description: 'script en package.json' });
+      else if (scripts.start) suggestions.push({ label: 'npm start',     description: 'script en package.json' });
+      else if (scripts.serve) suggestions.push({ label: 'npm run serve', description: 'script en package.json' });
     } catch {}
   }
 
-  // Python files — detect streamlit vs plain python
+  // Python files — detect Flask, Streamlit, o plain Python
   let pyFiles = [];
   try { pyFiles = fs.readdirSync(root).filter(f => f.endsWith('.py')); } catch {}
 
+  const flaskFiles = [];
   const streamlitFiles = [];
+
   for (const f of pyFiles) {
     try {
       const content = fs.readFileSync(path.join(root, f), 'utf8');
       if (content.includes('import streamlit') || content.includes('from streamlit')) {
         streamlitFiles.push(f);
+      } else if (content.includes('from flask') || content.includes('import flask') || content.includes('Flask(__name__)')) {
+        flaskFiles.push(f);
       }
     } catch {}
   }
 
   if (streamlitFiles.length > 0) {
-    // Multipage apps suelen empezar con 0_, si no app.py, si no el primero
     const entry = streamlitFiles.find(f => /^0_/i.test(f))
       || streamlitFiles.find(f => f === 'app.py')
       || streamlitFiles[0];
     suggestions.push({ label: `streamlit run ${entry}`, description: 'Streamlit app detectada' });
+  } else if (flaskFiles.length > 0) {
+    const entry = flaskFiles.find(f => f === 'app.py') || flaskFiles[0];
+    suggestions.push({ label: `flask run`, description: `Flask app detectada (${entry})` });
+    suggestions.push({ label: `python ${entry}`, description: `Correr directamente con Python` });
   } else {
     const mainPy = pyFiles.find(f => f === 'app.py') || pyFiles.find(f => f === 'main.py');
     if (mainPy) suggestions.push({ label: `python ${mainPy}`, description: 'Python app detectada' });
@@ -81,10 +88,10 @@ function detectCommands(root) {
 }
 
 function activate(context) {
-  // Status bar item
+  // Status bar item — click abre el editor para ver/cambiar el comando
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-  statusBar.command = 'runCommandHint.runCommand';
-  statusBar.tooltip = 'Click to run in terminal  |  Right-click for options';
+  statusBar.command = 'runCommandHint.setCommand';
+  statusBar.tooltip = 'Click para editar el comando  |  Paleta: "Run Command: Run" para ejecutar';
   context.subscriptions.push(statusBar);
 
   function refresh() {
@@ -114,7 +121,7 @@ function activate(context) {
     vscode.workspace.onDidChangeWorkspaceFolders(refresh)
   );
 
-  // Auto-detect on startup if no command is saved
+  // Auto-detect on startup si no hay comando guardado
   async function autoDetect() {
     const root = getProjectRoot();
     if (!root || readCommand(root)) return;
@@ -122,13 +129,13 @@ function activate(context) {
     if (detected.length === 0) return;
     const top = detected[0].label;
     const pick = await vscode.window.showInformationMessage(
-      `Run command detected: ${top}`,
-      'Save', 'Choose...'
+      `Run command detectado: ${top}`,
+      'Guardar', 'Elegir...'
     );
-    if (pick === 'Save') {
+    if (pick === 'Guardar') {
       writeCommand(root, top);
       refresh();
-    } else if (pick === 'Choose...') {
+    } else if (pick === 'Elegir...') {
       vscode.commands.executeCommand('runCommandHint.setCommand');
     }
   }
@@ -136,10 +143,11 @@ function activate(context) {
 
   // --- Commands ---
 
+  // Click en barra de estado → abre picker para ver/editar/cambiar
   context.subscriptions.push(
     vscode.commands.registerCommand('runCommandHint.setCommand', async () => {
       const root = getProjectRoot();
-      if (!root) return vscode.window.showErrorMessage('No workspace open.');
+      if (!root) return vscode.window.showErrorMessage('No hay workspace abierto.');
 
       const current = readCommand(root) || '';
       const detected = detectCommands(root);
@@ -148,18 +156,27 @@ function activate(context) {
 
       if (detected.length > 0) {
         const MANUAL = { label: '$(pencil) Escribir manualmente...', description: '' };
-        const items = [...detected, MANUAL];
+        const CLEAR  = { label: '$(trash) Borrar comando guardado',  description: '' };
+        const items  = [...detected, MANUAL, ...(current ? [CLEAR] : [])];
         const pick = await vscode.window.showQuickPick(items, {
-          title: 'Set Run Command',
-          placeHolder: 'Comando detectado — elige uno o escribe el tuyo',
+          title: 'Run Command',
+          placeHolder: current
+            ? `Actual: ${current} — elige otro o edita`
+            : 'Comando detectado — elige uno o escribe el tuyo',
         });
-        if (pick === undefined) return; // cancelled
+        if (pick === undefined) return;
+        if (pick === CLEAR) {
+          clearCommand(root);
+          vscode.window.showInformationMessage('Run command eliminado.');
+          refresh();
+          return;
+        }
         if (pick === MANUAL) {
           cmd = await vscode.window.showInputBox({
             prompt: 'Comando para correr este proyecto',
             value: current,
             placeHolder: 'npm run dev',
-            title: 'Set Run Command',
+            title: 'Run Command',
           });
           if (cmd === undefined) return;
         } else {
@@ -170,22 +187,23 @@ function activate(context) {
           prompt: 'Comando para correr este proyecto (ej. npm run dev, python app.py)',
           value: current,
           placeHolder: 'npm run dev',
-          title: 'Set Run Command',
+          title: 'Run Command',
         });
         if (cmd === undefined) return;
       }
 
       if (cmd.trim() === '') {
         clearCommand(root);
-        vscode.window.showInformationMessage('Run command cleared.');
+        vscode.window.showInformationMessage('Run command eliminado.');
       } else {
         writeCommand(root, cmd);
-        vscode.window.showInformationMessage(`Run command saved: ${cmd}`);
+        vscode.window.showInformationMessage(`Run command guardado: ${cmd}`);
       }
       refresh();
     })
   );
 
+  // Paleta de comandos → ejecutar directamente en terminal
   context.subscriptions.push(
     vscode.commands.registerCommand('runCommandHint.runCommand', async () => {
       const root = getProjectRoot();
@@ -207,15 +225,10 @@ function activate(context) {
       const root = getProjectRoot();
       if (!root) return;
       clearCommand(root);
-      vscode.window.showInformationMessage('Run command cleared.');
+      vscode.window.showInformationMessage('Run command eliminado.');
       refresh();
     })
   );
-
-  // Status bar click shows a quick pick with all options
-  // Override the direct run with a menu when right-clicking... 
-  // VS Code doesn't support right-click on status bar natively,
-  // so we use the Command Palette for extras.
 
   refresh();
 }
