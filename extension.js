@@ -143,12 +143,16 @@ function activate(context) {
     vscode.workspace.onDidChangeWorkspaceFolders(refresh)
   );
 
-  // Auto-detect on startup: guarda el primer comando detectado y notifica
-  async function autoDetect() {
+  // Detecta, guarda el primer resultado y notifica. force=true ignora comando existente.
+  async function runDetect(force = false) {
     const root = getProjectRoot();
-    if (!root || readCommand(root)) return;
+    if (!root) return;
+    if (!force && readCommand(root)) return;
     const detected = detectCommands(root);
-    if (detected.length === 0) return;
+    if (detected.length === 0) {
+      if (force) vscode.window.showInformationMessage('No se detectó ningún comando en este proyecto.');
+      return;
+    }
     const top = detected[0].label;
     writeCommand(root, top);
     refresh();
@@ -160,7 +164,7 @@ function activate(context) {
       vscode.commands.executeCommand('runCommandHint.setCommand');
     }
   }
-  autoDetect();
+  runDetect();
 
   // --- Commands ---
 
@@ -176,9 +180,10 @@ function activate(context) {
       let cmd;
 
       if (detected.length > 0) {
-        const MANUAL = { label: '$(pencil) Escribir manualmente...', description: '' };
-        const CLEAR  = { label: '$(trash) Borrar comando guardado',  description: '' };
-        const items  = [...detected, MANUAL, ...(current ? [CLEAR] : [])];
+        const MANUAL   = { label: '$(pencil) Escribir manualmente...', description: '' };
+        const REDETECT = { label: '$(refresh) Detectar de nuevo',       description: '' };
+        const CLEAR    = { label: '$(trash) Borrar comando guardado',   description: '' };
+        const items    = [...detected, MANUAL, REDETECT, ...(current ? [CLEAR] : [])];
         const pick = await vscode.window.showQuickPick(items, {
           title: 'Run Command',
           placeHolder: current
@@ -186,6 +191,10 @@ function activate(context) {
             : 'Comando detectado — elige uno o escribe el tuyo',
         });
         if (pick === undefined) return;
+        if (pick === REDETECT) {
+          await runDetect(true);
+          return;
+        }
         if (pick === CLEAR) {
           clearCommand(root);
           vscode.window.showInformationMessage('Run command eliminado.');
@@ -240,6 +249,12 @@ function activate(context) {
         || vscode.window.createTerminal({ name: 'Run', cwd: root });
       terminal.show();
       terminal.sendText(cmd);
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('runCommandHint.detectCommand', async () => {
+      await runDetect(true);
     })
   );
 

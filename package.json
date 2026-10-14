@@ -20,6 +20,10 @@
       {
         "command": "runCommandHint.clearCommand",
         "title": "Run Command: Clear project command"
+      },
+      {
+        "command": "runCommandHint.detectCommand",
+        "title": "Run Command: Detect automatically"
       }
     ]
   },
