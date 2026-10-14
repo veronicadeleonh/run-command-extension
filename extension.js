@@ -35,15 +35,37 @@ function clearCommand(root) {
 function detectCommands(root) {
   const suggestions = [];
 
-  // package.json → npm scripts
-  const pkgPath = path.join(root, 'package.json');
-  if (fs.existsSync(pkgPath)) {
+  // package.json → npm scripts (root first, then one level deep)
+  const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'out', '.next', 'coverage', 'vendor']);
+
+  function npmSuggestion(dir, prefix) {
+    const pkgPath = path.join(dir, 'package.json');
+    if (!fs.existsSync(pkgPath)) return null;
     try {
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-      const scripts = pkg.scripts || {};
-      if (scripts.dev)        suggestions.push({ label: 'npm run dev',   description: 'script en package.json' });
-      else if (scripts.start) suggestions.push({ label: 'npm start',     description: 'script en package.json' });
-      else if (scripts.serve) suggestions.push({ label: 'npm run serve', description: 'script en package.json' });
+      const scripts = JSON.parse(fs.readFileSync(pkgPath, 'utf8')).scripts || {};
+      const script = scripts.dev ? `npm run dev`
+        : scripts.start         ? `npm start`
+        : scripts.serve         ? `npm run serve`
+        : null;
+      if (!script) return null;
+      const label = prefix ? `cd ${prefix} && ${script}` : script;
+      const description = prefix ? `script en ${prefix}/package.json` : 'script en package.json';
+      return { label, description };
+    } catch { return null; }
+  }
+
+  const rootNpm = npmSuggestion(root, null);
+  if (rootNpm) {
+    suggestions.push(rootNpm);
+  } else {
+    // buscar en subdirectorios inmediatos
+    try {
+      const entries = fs.readdirSync(root, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory() || SKIP_DIRS.has(entry.name) || entry.name.startsWith('.')) continue;
+        const s = npmSuggestion(path.join(root, entry.name), entry.name);
+        if (s) suggestions.push(s);
+      }
     } catch {}
   }
 
