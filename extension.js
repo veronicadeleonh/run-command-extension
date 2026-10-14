@@ -88,10 +88,10 @@ function detectCommands(root) {
 }
 
 function activate(context) {
-  // Status bar item — click abre el editor para ver/cambiar el comando
+  // Status bar item — click ejecuta el comando en terminal
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-  statusBar.command = 'runCommandHint.setCommand';
-  statusBar.tooltip = 'Click para editar el comando  |  Paleta: "Run Command: Run" para ejecutar';
+  statusBar.command = 'runCommandHint.runCommand';
+  statusBar.tooltip = 'Click para ejecutar  |  Paleta: "Run Command: Edit" para cambiar el comando';
   context.subscriptions.push(statusBar);
 
   function refresh() {
@@ -121,21 +121,20 @@ function activate(context) {
     vscode.workspace.onDidChangeWorkspaceFolders(refresh)
   );
 
-  // Auto-detect on startup si no hay comando guardado
+  // Auto-detect on startup: guarda el primer comando detectado y notifica
   async function autoDetect() {
     const root = getProjectRoot();
     if (!root || readCommand(root)) return;
     const detected = detectCommands(root);
     if (detected.length === 0) return;
     const top = detected[0].label;
+    writeCommand(root, top);
+    refresh();
     const pick = await vscode.window.showInformationMessage(
       `Run command detectado: ${top}`,
-      'Guardar', 'Elegir...'
+      'Editar...'
     );
-    if (pick === 'Guardar') {
-      writeCommand(root, top);
-      refresh();
-    } else if (pick === 'Elegir...') {
+    if (pick === 'Editar...') {
       vscode.commands.executeCommand('runCommandHint.setCommand');
     }
   }
@@ -203,15 +202,17 @@ function activate(context) {
     })
   );
 
-  // Paleta de comandos → ejecutar directamente en terminal
+  // Click en barra de estado / paleta → ejecuta en terminal
   context.subscriptions.push(
     vscode.commands.registerCommand('runCommandHint.runCommand', async () => {
       const root = getProjectRoot();
       if (!root) return;
-      const cmd = readCommand(root);
+      let cmd = readCommand(root);
       if (!cmd) {
-        vscode.commands.executeCommand('runCommandHint.setCommand');
-        return;
+        // Sin comando guardado: primero configurar
+        await vscode.commands.executeCommand('runCommandHint.setCommand');
+        cmd = readCommand(root);
+        if (!cmd) return;
       }
       const terminal = vscode.window.activeTerminal
         || vscode.window.createTerminal({ name: 'Run', cwd: root });
