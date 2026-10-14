@@ -54,20 +54,18 @@ function detectCommands(root) {
     } catch { return null; }
   }
 
+  // Buscar siempre en raíz Y en subdirectorios inmediatos
   const rootNpm = npmSuggestion(root, null);
-  if (rootNpm) {
-    suggestions.push(rootNpm);
-  } else {
-    // buscar en subdirectorios inmediatos
-    try {
-      const entries = fs.readdirSync(root, { withFileTypes: true });
-      for (const entry of entries) {
-        if (!entry.isDirectory() || SKIP_DIRS.has(entry.name) || entry.name.startsWith('.')) continue;
-        const s = npmSuggestion(path.join(root, entry.name), entry.name);
-        if (s) suggestions.push(s);
-      }
-    } catch {}
-  }
+  if (rootNpm) suggestions.push(rootNpm);
+
+  try {
+    const entries = fs.readdirSync(root, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory() || SKIP_DIRS.has(entry.name) || entry.name.startsWith('.')) continue;
+      const s = npmSuggestion(path.join(root, entry.name), entry.name);
+      if (s) suggestions.push(s);
+    }
+  } catch {}
 
   // Python files — detect Flask, Streamlit, o plain Python
   let pyFiles = [];
@@ -201,17 +199,15 @@ function activate(context) {
           refresh();
           return;
         }
-        if (pick === MANUAL) {
-          cmd = await vscode.window.showInputBox({
-            prompt: 'Comando para correr este proyecto',
-            value: current,
-            placeHolder: 'npm run dev',
-            title: 'Run Command',
-          });
-          if (cmd === undefined) return;
-        } else {
-          cmd = pick.label;
-        }
+        // Siempre pasar por input box para permitir editar antes de guardar
+        const prefill = pick === MANUAL ? current : pick.label;
+        cmd = await vscode.window.showInputBox({
+          prompt: 'Edita el comando si es necesario y presiona Enter',
+          value: prefill,
+          placeHolder: 'npm run dev',
+          title: 'Run Command',
+        });
+        if (cmd === undefined) return;
       } else {
         cmd = await vscode.window.showInputBox({
           prompt: 'Comando para correr este proyecto (ej. npm run dev, python app.py)',
